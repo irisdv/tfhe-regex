@@ -1,3 +1,5 @@
+use regex_syntax::hir::{Hir, HirKind, Literal, Visitor};
+
 #[derive(Debug)]
 pub enum Instruction {
     Char(u8),
@@ -40,5 +42,45 @@ impl Machine {
             }
         }
         true
+    }
+}
+
+pub struct ProgramFactory {
+    program: Program,
+}
+
+impl Default for ProgramFactory {
+    fn default() -> Self {
+        Self {
+            program: Vec::new(),
+        }
+    }
+}
+
+impl Visitor for ProgramFactory {
+    type Err = ();
+    type Output = Vec<Instruction>;
+
+    fn visit_pre(&mut self, hir: &Hir) -> Result<(), Self::Err> {
+        match hir.kind() {
+            HirKind::Concat(_) => {}
+            HirKind::Literal(literal) => match literal {
+                Literal::Unicode(c) => {
+                    self.program.push(Instruction::Char(*c as u8));
+                }
+                Literal::Byte(b) => {
+                    self.program.push(Instruction::Char(*b));
+                }
+            },
+            HirKind::Empty => {
+                self.program.push(Instruction::Match);
+            }
+            _ => todo!(),
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Self::Output, Self::Err> {
+        Ok(self.program)
     }
 }
