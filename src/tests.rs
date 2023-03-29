@@ -268,3 +268,19 @@ fn case_insensitive_argument_should_succeed() {
     let mut machine = Machine::new(program);
     assert!(machine.run("ABC".to_string()));
 }
+
+#[test]
+fn alternation_should_succeed() {
+    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(machine.run("0a".to_string()));
+}
+
+#[test]
+fn alternation_should_succeed_2() {
+    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(machine.run("bcd".to_string()));
+}
