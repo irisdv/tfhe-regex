@@ -284,3 +284,44 @@ fn alternation_should_succeed_2() {
     let mut machine = Machine::new(program);
     assert!(machine.run("bcd".to_string()));
 }
+
+#[test]
+fn alternation_should_succeed_3() {
+    let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(machine.run("abc42".to_string()));
+}
+
+#[test]
+fn alternation_should_succeed_4() {
+    let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(machine.run("aed42".to_string()));
+}
+
+
+#[test]
+fn alternation_should_fail() {
+    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(!machine.run("0b".to_string()));
+}
+
+#[test]
+fn alternation_should_fail_2() {
+    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(!machine.run("bce".to_string()));
+}
+
+#[test]
+fn alternation_should_fail_3() {
+    let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(!machine.run("abd42".to_string()));
+}
