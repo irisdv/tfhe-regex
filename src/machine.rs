@@ -1,8 +1,6 @@
-use regex_syntax::{
-    hir::{
-        Anchor, Class, ClassUnicodeRange, Hir, HirKind, Literal, RepetitionKind, RepetitionRange,
-        Visitor,
-    },
+use regex_syntax::hir::{
+    Anchor, Class, ClassUnicodeRange, Hir, HirKind, Literal, RepetitionKind, RepetitionRange,
+    Visitor,
 };
 
 #[derive(Debug, Clone)]
@@ -13,7 +11,8 @@ pub enum Instruction {
     Repetition(u8),   // 0 to infinite repetition of a character
     OptionalChar(u8), // in case of bounded repetitions or ZeroOrOneRepetition
     IntervalChar(Vec<ClassUnicodeRange>),
-    Branch(usize), // in case of split
+    Branch(usize), // context to fallback
+    Jump(usize),
 }
 
 #[derive(Default, Clone, Debug)]
@@ -78,12 +77,20 @@ impl Machine {
                             // Failed match, backtrack to previous state
                             let prev_state = self.program_counter.saturating_sub(1);
                             let prev_item = self.program[prev_state].clone();
-                            state = prev_item.action.next;
-                            self.string_counter =
-                                (self.string_counter as i32 + prev_item.action.offset) as usize;
-                            self.program_counter = prev_state;
-                            if exact_match {
-                                return false;
+                            match prev_item.instruction {
+                                Instruction::Jump(_) => {
+                                    return false;
+                                }
+                                _ => {
+                                    state = prev_item.action.next;
+                                    self.string_counter = (self.string_counter as i32
+                                        + prev_item.action.offset)
+                                        as usize;
+                                    self.program_counter = prev_state;
+                                    if exact_match {
+                                        return false;
+                                    }
+                                }
                             }
                         } else {
                             let context = self.stack.pop().unwrap();
@@ -162,6 +169,9 @@ impl Machine {
                     self.stack.push(context);
                     self.program_counter += 1;
                 }
+                Instruction::Jump(pc) => {
+                    self.program_counter = pc;
+                }
             }
         }
         true
@@ -172,6 +182,7 @@ pub struct ProgramFactory {
     program: Program,
     is_repetition: bool,
     branch_counter: usize,
+    jump_counter: usize,
 }
 
 impl Default for ProgramFactory {
@@ -180,6 +191,7 @@ impl Default for ProgramFactory {
             program: Vec::new(),
             is_repetition: false,
             branch_counter: 0,
+            jump_counter: 0,
         }
     }
 }
@@ -191,6 +203,9 @@ impl Visitor for ProgramFactory {
     fn visit_post(&mut self, hir: &Hir) -> Result<(), Self::Err> {
         if let HirKind::Repetition(_) = hir.kind() {
             self.is_repetition = false;
+        }
+        if let HirKind::Alternation(_) = hir.kind() {
+            self.program[self.jump_counter].instruction = Instruction::Jump(self.program.len());
         }
         Ok(())
     }
@@ -257,14 +272,14 @@ impl Visitor for ProgramFactory {
                 Anchor::EndLine => todo!(),
             },
             HirKind::Alternation(hirs) => {
-                self.branch_counter = self.program.len() + start;
                 self.program.push(ProgramItem {
                     instruction: Instruction::Branch(0),
                     action: Action {
-                        next: self.program.len() + 1,   // unused value
-                        offset: 0, // unused value
+                        next: self.program.len() + 1, // unused value
+                        offset: 0,                    // unused value
                     },
-                })
+                });
+                self.branch_counter = self.program.len() - 1;
             }
             HirKind::Repetition(repetition) => {
                 self.is_repetition = true;
@@ -430,8 +445,13 @@ impl Visitor for ProgramFactory {
     }
 
     fn visit_alternation_in(&mut self) -> Result<(), Self::Err> {
-        self.program[self.branch_counter].instruction =
-            Instruction::Branch(self.program.len());
+        self.program.push(ProgramItem {
+            instruction: Instruction::Jump(0),
+            action: Action { next: 0, offset: 0 },
+        });
+        self.jump_counter = self.program.len() - 1;
+
+        self.program[self.branch_counter].instruction = Instruction::Branch(self.program.len());
         Ok(())
     }
     fn finish(self) -> Result<Self::Output, Self::Err> {
