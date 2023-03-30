@@ -1,4 +1,4 @@
-use tfhe::shortint::{ciphertext::Ciphertext, ClientKey, ServerKey};
+use tfhe::shortint::{ciphertext::Ciphertext, ServerKey};
 
 use crate::program::{CipherInstruction, CipherProgram};
 
@@ -10,7 +10,6 @@ struct Context {
 
 type Stack = Vec<Context>;
 
-type IsTrueCipher = fn(&Ciphertext) -> bool;
 
 
 pub struct TFHEMachine {
@@ -19,25 +18,26 @@ pub struct TFHEMachine {
     program: CipherProgram,
     stack: Stack,
     server_key: ServerKey,
-    client_key: ClientKey,
+}
+
+
+pub trait CheckerCipherTrait {
+    fn is_true(&self, ct: &Ciphertext) -> bool;
 }
 
 impl TFHEMachine {
-    pub fn ct_are_equal(&self, _is_true: IsTrueCipher, ct_left: &Ciphertext, ct_right: &Ciphertext) -> bool {
+    pub fn ct_are_equal(&self, checker: &impl CheckerCipherTrait, ct_left: &Ciphertext, ct_right: &Ciphertext) -> bool {
         let ct_result = self.server_key.unchecked_equal(ct_left, ct_right);
-        let result = self.client_key.decrypt(&ct_result);
-        // is_true(&ct_result)
-        result == 1
+        checker.is_true(&ct_result)
     }
 
-    pub fn new(program: CipherProgram, server_key: ServerKey, client_key: ClientKey) -> Self {
+    pub fn new(program: CipherProgram, server_key: ServerKey) -> Self {
         Self {
             program_counter: 0,
             string_counter: 0,
             program,
             stack: Stack::new(),
             server_key: server_key,
-            client_key: client_key,
         }
     }
 
@@ -47,7 +47,7 @@ impl TFHEMachine {
         self.stack = Stack::new();
     }
 
-    pub fn run(&mut self, input: Vec<Ciphertext>, is_true: IsTrueCipher) -> bool {
+    pub fn run(&mut self, input: Vec<Ciphertext>, checker: &impl CheckerCipherTrait) -> bool {
         let mut state = 0;
         let mut exact_match = false;
 
@@ -65,7 +65,7 @@ impl TFHEMachine {
                         return false;
                     }
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(is_true, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, &ct_input, &ct);
                     if !result {
                         if self.stack.is_empty() {
                             // Failed match, backtrack to previous state
@@ -109,7 +109,7 @@ impl TFHEMachine {
                 }
                 CipherInstruction::CipherRepetition(ct) => {
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(is_true, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, &ct_input, &ct);
                     if result {
                         self.string_counter =
                             (self.string_counter as i32 + current_item.action.offset) as usize;
@@ -120,7 +120,7 @@ impl TFHEMachine {
                 }
                 CipherInstruction::CipherOptionalChar(ct) => {
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(is_true, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, &ct_input, &ct);
                     if result {
                         // if it matches we will go next character of the string
                         self.string_counter =
