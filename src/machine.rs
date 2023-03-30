@@ -54,6 +54,12 @@ impl Machine {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.program_counter = 0;
+        self.string_counter = 0;
+        self.stack = Stack::new();
+    }
+
     pub fn run(&mut self, input: String) -> bool {
         let mut state = 0;
         let mut exact_match = false;
@@ -271,7 +277,7 @@ impl Visitor for ProgramFactory {
                 Anchor::StartLine => todo!(),
                 Anchor::EndLine => todo!(),
             },
-            HirKind::Alternation(hirs) => {
+            HirKind::Alternation(_) => {
                 self.program.push(ProgramItem {
                     instruction: Instruction::Branch(0),
                     action: Action {

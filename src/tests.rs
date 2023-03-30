@@ -275,29 +275,17 @@ fn alternation_should_succeed() {
     let program = visit(&hir, ProgramFactory::default()).unwrap();
     let mut machine = Machine::new(program);
     assert!(machine.run("0a".to_string()));
-}
-
-#[test]
-fn alternation_should_succeed_2() {
-    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
-    let program = visit(&hir, ProgramFactory::default()).unwrap();
-    let mut machine = Machine::new(program);
+    machine.reset();
     assert!(machine.run("bcd".to_string()));
 }
 
 #[test]
-fn alternation_should_succeed_3() {
+fn alternation_should_succeed_2() {
     let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
     let program = visit(&hir, ProgramFactory::default()).unwrap();
     let mut machine = Machine::new(program);
     assert!(machine.run("abc42".to_string()));
-}
-
-#[test]
-fn alternation_should_succeed_4() {
-    let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
-    let program = visit(&hir, ProgramFactory::default()).unwrap();
-    let mut machine = Machine::new(program);
+    machine.reset();
     assert!(machine.run("aed42".to_string()));
 }
 
@@ -308,20 +296,36 @@ fn alternation_should_fail() {
     let program = visit(&hir, ProgramFactory::default()).unwrap();
     let mut machine = Machine::new(program);
     assert!(!machine.run("0b".to_string()));
-}
-
-#[test]
-fn alternation_should_fail_2() {
-    let hir = Parser::new().parse(r"0a|bcd$").unwrap();
-    let program = visit(&hir, ProgramFactory::default()).unwrap();
-    let mut machine = Machine::new(program);
+    machine.reset();
     assert!(!machine.run("bce".to_string()));
 }
 
 #[test]
-fn alternation_should_fail_3() {
+fn alternation_should_fail_2() {
     let hir = Parser::new().parse(r"a(bc|ed)42$").unwrap();
     let program = visit(&hir, ProgramFactory::default()).unwrap();
     let mut machine = Machine::new(program);
     assert!(!machine.run("abd42".to_string()));
+    machine.reset();
+    assert!(!machine.run("abed42".to_string()));
+}
+
+#[test]
+fn alternation_string_numbered_matching_should_succeed() {
+    let hir = Parser::new().parse(r"^hel(ab{2}|l{3,}o)bc$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(machine.run("helabbbc".to_string()));
+    machine.reset();
+    assert!(machine.run("helllllllobc".to_string()));
+}
+
+#[test]
+fn alternation_string_numbered_matching_should_fail() {
+    let hir = Parser::new().parse(r"^hel(ab{2}|l{3,}o)bc$").unwrap();
+    let program = visit(&hir, ProgramFactory::default()).unwrap();
+    let mut machine = Machine::new(program);
+    assert!(!machine.run("helabbc".to_string()));
+    machine.reset();
+    assert!(!machine.run("helllobc".to_string()));
 }
