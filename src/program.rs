@@ -1,4 +1,5 @@
 use regex_syntax::hir::ClassUnicodeRange;
+use tfhe::shortint::{ciphertext::Ciphertext, ClientKey};
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
@@ -7,6 +8,18 @@ pub enum Instruction {
     Start,            // Anchor start
     Repetition(u8),   // 0 to infinite repetition of a character
     OptionalChar(u8), // in case of bounded repetitions or ZeroOrOneRepetition
+    IntervalChar(Vec<ClassUnicodeRange>),
+    Branch(usize), // context to fallback
+    Jump(usize),
+}
+
+#[derive(Clone)]
+pub enum CipherInstruction {
+    CipherChar(Ciphertext),
+    Match,            // Anchor end
+    Start,            // Anchor start
+    CipherRepetition(Ciphertext),
+    CipherOptionalChar(Ciphertext),
     IntervalChar(Vec<ClassUnicodeRange>),
     Branch(usize), // context to fallback
     Jump(usize),
@@ -25,3 +38,42 @@ pub struct ProgramItem {
 }
 
 pub type Program = Vec<ProgramItem>;
+
+#[derive(Clone)]
+pub struct CipherProgramItem {
+    pub instruction: CipherInstruction,
+    pub action: Action,
+}
+
+pub type CipherProgram = Vec<CipherProgramItem>;
+
+fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> CipherProgramItem {
+    let instruction: CipherInstruction = match program_item.instruction {
+        Instruction::Char(c) => {
+            let ct = client_key.encrypt(c as u64);
+            CipherInstruction::CipherChar(ct)
+        }
+        Instruction::Match => CipherInstruction::Match,
+        Instruction::Start => CipherInstruction::Start,
+        Instruction::Repetition(c) => {
+            let ct = client_key.encrypt(c as u64);
+            CipherInstruction::CipherRepetition(ct)
+        }
+        Instruction::OptionalChar(c) => {
+            let ct = client_key.encrypt(c as u64);
+            CipherInstruction::CipherOptionalChar(ct)
+        }
+        Instruction::Branch(pc) => CipherInstruction::Branch(pc),
+        Instruction::Jump(pc) => CipherInstruction::Jump(pc),
+        _ => unimplemented!()
+    };
+    CipherProgramItem { instruction: instruction, action: program_item.action.clone() }
+}
+
+pub fn cipher_program(client_key: &ClientKey, program: Program) -> CipherProgram {
+    let cipher_program = program
+    .iter()
+    .map(|program_item| cipher_program_item(client_key, program_item))
+    .collect();
+    cipher_program
+}
