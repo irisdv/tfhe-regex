@@ -1,16 +1,13 @@
-use machine::Machine;
-use regex_syntax::hir::visit;
-use regex_syntax::Parser;
+pub mod compiler;
+pub mod machine;
+pub mod program;
 
-use crate::machine::ProgramFactory;
-
-mod machine;
 #[cfg(test)]
 mod tests;
 
 fn main() {
-    let hir = Parser::new().parse(r"abc").unwrap();
-    let program = visit(&hir, ProgramFactory::default()).unwrap();
-    let mut machine = Machine::new(program);
+    let program = compiler::Compiler::compile(r"abc");
+
+    let mut machine = machine::Machine::new(program);
     println!("{:?}", machine.run("abcc".to_string()));
 }
