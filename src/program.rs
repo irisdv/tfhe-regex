@@ -14,13 +14,19 @@ pub enum Instruction {
 }
 
 #[derive(Clone)]
+pub struct CiphertextRange {
+    pub start: Ciphertext,
+    pub end: Ciphertext,
+}
+
+#[derive(Clone)]
 pub enum CipherInstruction {
     CipherChar(Ciphertext),
     Match,            // Anchor end
     Start,            // Anchor start
     CipherRepetition(Ciphertext),
     CipherOptionalChar(Ciphertext),
-    IntervalChar(Vec<ClassUnicodeRange>),
+    CipherIntervalChar(Vec<CiphertextRange>),
     Branch(usize), // context to fallback
     Jump(usize),
 }
@@ -48,7 +54,7 @@ pub struct CipherProgramItem {
 pub type CipherProgram = Vec<CipherProgramItem>;
 
 fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> CipherProgramItem {
-    let instruction: CipherInstruction = match program_item.instruction {
+    let instruction: CipherInstruction = match program_item.instruction.clone() {
         Instruction::Char(c) => {
             let ct = client_key.encrypt(c as u64);
             CipherInstruction::CipherChar(ct)
@@ -63,9 +69,16 @@ fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> Ci
             let ct = client_key.encrypt(c as u64);
             CipherInstruction::CipherOptionalChar(ct)
         }
+        Instruction::IntervalChar(ranges) => {
+            let cipher_ranges = ranges.iter().map(|range| {
+                let start = client_key.encrypt(range.start() as u64);
+                let end = client_key.encrypt(range.end() as u64);
+                CiphertextRange {start: start, end: end}
+            }).collect();
+            CipherInstruction::CipherIntervalChar(cipher_ranges)
+        }
         Instruction::Branch(pc) => CipherInstruction::Branch(pc),
         Instruction::Jump(pc) => CipherInstruction::Jump(pc),
-        _ => unimplemented!()
     };
     CipherProgramItem { instruction: instruction, action: program_item.action.clone() }
 }

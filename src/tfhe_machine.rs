@@ -10,8 +10,6 @@ struct Context {
 
 type Stack = Vec<Context>;
 
-
-
 pub struct TFHEMachine {
     program_counter: usize,
     string_counter: usize,
@@ -20,17 +18,32 @@ pub struct TFHEMachine {
     server_key: ServerKey,
 }
 
-
 pub trait CheckerCipherTrait {
     fn is_true(&self, ct: &Ciphertext) -> bool;
 }
 
 impl TFHEMachine {
-    pub fn ct_are_equal(&self, checker: &impl CheckerCipherTrait, ct_left: &Ciphertext, ct_right: &Ciphertext) -> bool {
+    pub fn ct_are_equal(
+        &self,
+        checker: &impl CheckerCipherTrait,
+        ct_left: &Ciphertext,
+        ct_right: &Ciphertext,
+    ) -> bool {
         let ct_result = self.server_key.unchecked_equal(ct_left, ct_right);
         checker.is_true(&ct_result)
     }
-
+    pub fn ct_in_range(
+        &self,
+        checker: &impl CheckerCipherTrait,
+        ct_value: &Ciphertext,
+        ct_start: &Ciphertext,
+        ct_end: &Ciphertext,
+    ) -> bool {
+        let ct_greater = self.server_key.unchecked_greater_or_equal(ct_value, ct_start);
+        let ct_less = self.server_key.unchecked_less_or_equal(ct_value, ct_end);
+        let ct_result = self.server_key.unchecked_mul_lsb(&ct_less, &ct_greater);
+        checker.is_true(&ct_result)
+    }
     pub fn new(program: CipherProgram, server_key: ServerKey) -> Self {
         Self {
             program_counter: 0,
@@ -130,12 +143,11 @@ impl TFHEMachine {
                     state = current_item.action.next;
                     self.program_counter += 1;
                 }
-                /* 
-                Instruction::IntervalChar(ranges) => {
+                CipherInstruction::CipherIntervalChar(ranges) => {
                     let mut has_matched = false;
-                    let result = input.as_bytes()[self.string_counter];
+                    let ct_input = input[self.string_counter].clone();
                     for range in ranges.iter() {
-                        if range.start() as u8 <= result && result <= range.end() as u8 {
+                        if self.ct_in_range(checker, &ct_input, &range.start, &range.end) {
                             // we're in the right range, it matches
                             self.string_counter =
                                 (self.string_counter as i32 + current_item.action.offset) as usize;
@@ -158,7 +170,6 @@ impl TFHEMachine {
                         }
                     }
                 }
-                */
                 CipherInstruction::Branch(pc) => {
                     let context = Context {
                         program_counter: pc,
@@ -170,10 +181,8 @@ impl TFHEMachine {
                 CipherInstruction::Jump(pc) => {
                     self.program_counter = pc;
                 }
-                _ => unimplemented!()
             }
         }
         true
     }
 }
-
