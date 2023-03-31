@@ -3,7 +3,7 @@ use regex_syntax::hir::{
 };
 use regex_syntax::Parser;
 
-use crate::program::{Action, Instruction, Program, ProgramItem};
+use crate::program::{Action, Instruction, IntervalCharOptions, Program, ProgramItem};
 
 pub struct Compiler {}
 
@@ -120,8 +120,8 @@ impl Visitor for ProgramFactory {
             HirKind::Repetition(repetition) => {
                 self.is_repetition = true;
                 match repetition.kind.clone() {
-                    RepetitionKind::OneOrMore => {
-                        if let HirKind::Literal(literal) = repetition.hir.kind() {
+                    RepetitionKind::OneOrMore => match repetition.hir.kind() {
+                        HirKind::Literal(literal) => {
                             let (instruction, repetition) = match literal {
                                 Literal::Unicode(c) => (
                                     Instruction::Char(*c as u8),
@@ -146,9 +146,38 @@ impl Visitor for ProgramFactory {
                                 },
                             });
                         }
-                    }
-                    RepetitionKind::ZeroOrMore => {
-                        if let HirKind::Literal(literal) = repetition.hir.kind() {
+                        HirKind::Class(class) => match class {
+                            Class::Unicode(set) => {
+                                let range_chars = set.ranges().to_owned();
+                                self.program.push(ProgramItem {
+                                    instruction: Instruction::IntervalChar(IntervalCharOptions {
+                                        range: range_chars.clone(),
+                                        can_repeat: false,
+                                        is_optional: false,
+                                    }),
+                                    action: Action {
+                                        next: self.program.len() + 1 + start,
+                                        offset: 1,
+                                    },
+                                });
+                                self.program.push(ProgramItem {
+                                    instruction: Instruction::IntervalChar(IntervalCharOptions {
+                                        range: range_chars,
+                                        can_repeat: true,
+                                        is_optional: false,
+                                    }),
+                                    action: Action {
+                                        next: self.program.len() + 1 + start,
+                                        offset: 1,
+                                    },
+                                });
+                            }
+                            Class::Bytes(_) => todo!(),
+                        },
+                        _ => {}
+                    },
+                    RepetitionKind::ZeroOrMore => match repetition.hir.kind() {
+                        HirKind::Literal(literal) => {
                             let instruction = match literal {
                                 Literal::Unicode(c) => Instruction::Repetition(*c as u8),
                                 Literal::Byte(b) => Instruction::Repetition(*b),
@@ -161,9 +190,27 @@ impl Visitor for ProgramFactory {
                                 },
                             });
                         }
-                    }
-                    RepetitionKind::ZeroOrOne => {
-                        if let HirKind::Literal(literal) = repetition.hir.kind() {
+                        HirKind::Class(class) => match class {
+                            Class::Unicode(set) => {
+                                let range_chars = set.ranges().to_owned();
+                                self.program.push(ProgramItem {
+                                    instruction: Instruction::IntervalChar(IntervalCharOptions {
+                                        range: range_chars,
+                                        can_repeat: true,
+                                        is_optional: false,
+                                    }),
+                                    action: Action {
+                                        next: self.program.len() + 1 + start,
+                                        offset: 1,
+                                    },
+                                });
+                            }
+                            Class::Bytes(_) => todo!(),
+                        },
+                        _ => {}
+                    },
+                    RepetitionKind::ZeroOrOne => match repetition.hir.kind() {
+                        HirKind::Literal(literal) => {
                             let instruction = match literal {
                                 Literal::Unicode(c) => Instruction::OptionalChar(*c as u8),
                                 Literal::Byte(b) => Instruction::OptionalChar(*b),
@@ -176,15 +223,32 @@ impl Visitor for ProgramFactory {
                                 },
                             });
                         }
-                    }
+                        HirKind::Class(class) => match class {
+                            Class::Unicode(set) => {
+                                let range_chars = set.ranges().to_owned();
+                                self.program.push(ProgramItem {
+                                    instruction: Instruction::IntervalChar(IntervalCharOptions {
+                                        range: range_chars,
+                                        can_repeat: false,
+                                        is_optional: true,
+                                    }),
+                                    action: Action {
+                                        next: self.program.len() + 1 + start,
+                                        offset: 1,
+                                    },
+                                });
+                            }
+                            Class::Bytes(_) => todo!(),
+                        },
+                        _ => {}
+                    },
                     RepetitionKind::Range(range) => match range {
-                        RepetitionRange::Exactly(n) => {
-                            if let HirKind::Literal(literal) = repetition.hir.kind() {
+                        RepetitionRange::Exactly(n) => match repetition.hir.kind() {
+                            HirKind::Literal(literal) => {
                                 let instruction = match literal {
                                     Literal::Unicode(c) => Instruction::Char(*c as u8),
                                     Literal::Byte(b) => Instruction::Char(*b),
                                 };
-
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
                                         instruction: instruction.clone(),
@@ -195,9 +259,31 @@ impl Visitor for ProgramFactory {
                                     });
                                 }
                             }
-                        }
-                        RepetitionRange::AtLeast(n) => {
-                            if let HirKind::Literal(literal) = repetition.hir.kind() {
+                            HirKind::Class(class) => match class {
+                                Class::Unicode(set) => {
+                                    let range_chars = set.ranges().to_owned();
+                                    for _i in 0..n {
+                                        self.program.push(ProgramItem {
+                                            instruction: Instruction::IntervalChar(
+                                                IntervalCharOptions {
+                                                    range: range_chars.clone(),
+                                                    can_repeat: false,
+                                                    is_optional: false,
+                                                },
+                                            ),
+                                            action: Action {
+                                                next: self.program.len() + 1 + start,
+                                                offset: 1,
+                                            },
+                                        });
+                                    }
+                                }
+                                Class::Bytes(_) => todo!(),
+                            },
+                            _ => {}
+                        },
+                        RepetitionRange::AtLeast(n) => match repetition.hir.kind() {
+                            HirKind::Literal(literal) => {
                                 let (instruction, repetition) = match literal {
                                     Literal::Unicode(c) => (
                                         Instruction::Char(*c as u8),
@@ -207,7 +293,6 @@ impl Visitor for ProgramFactory {
                                         (Instruction::Char(*b), Instruction::Repetition(*b))
                                     }
                                 };
-
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
                                         instruction: instruction.clone(),
@@ -225,9 +310,44 @@ impl Visitor for ProgramFactory {
                                     },
                                 });
                             }
-                        }
-                        RepetitionRange::Bounded(m, n) => {
-                            if let HirKind::Literal(literal) = repetition.hir.kind() {
+                            HirKind::Class(class) => match class {
+                                Class::Unicode(set) => {
+                                    let range_chars = set.ranges().to_owned();
+                                    for _i in 0..n {
+                                        self.program.push(ProgramItem {
+                                            instruction: Instruction::IntervalChar(
+                                                IntervalCharOptions {
+                                                    range: range_chars.clone(),
+                                                    can_repeat: false,
+                                                    is_optional: false,
+                                                },
+                                            ),
+                                            action: Action {
+                                                next: self.program.len() + 1 + start,
+                                                offset: 1,
+                                            },
+                                        });
+                                    }
+                                    self.program.push(ProgramItem {
+                                        instruction: Instruction::IntervalChar(
+                                            IntervalCharOptions {
+                                                range: range_chars,
+                                                can_repeat: true,
+                                                is_optional: false,
+                                            },
+                                        ),
+                                        action: Action {
+                                            next: self.program.len() + 1 + start,
+                                            offset: 1,
+                                        },
+                                    });
+                                }
+                                Class::Bytes(_) => todo!(),
+                            },
+                            _ => {}
+                        },
+                        RepetitionRange::Bounded(m, n) => match repetition.hir.kind() {
+                            HirKind::Literal(literal) => {
                                 let (instruction, optional_char) = match literal {
                                     Literal::Unicode(c) => (
                                         Instruction::Char(*c as u8),
@@ -247,7 +367,7 @@ impl Visitor for ProgramFactory {
                                     });
                                 }
 
-                                for _i in 0..(n - m) {
+                                for _i in 0..n - m {
                                     self.program.push(ProgramItem {
                                         instruction: optional_char.clone(),
                                         action: Action {
@@ -257,23 +377,68 @@ impl Visitor for ProgramFactory {
                                     });
                                 }
                             }
-                        }
+                            HirKind::Class(class) => match class {
+                                Class::Unicode(set) => {
+                                    let range_chars = set.ranges().to_owned();
+                                    for _i in 0..m {
+                                        self.program.push(ProgramItem {
+                                            instruction: Instruction::IntervalChar(
+                                                IntervalCharOptions {
+                                                    range: range_chars.clone(),
+                                                    can_repeat: false,
+                                                    is_optional: false,
+                                                },
+                                            ),
+                                            action: Action {
+                                                next: self.program.len() + 1 + start,
+                                                offset: 1,
+                                            },
+                                        });
+                                    }
+                                    for _i in 0..n - m {
+                                        self.program.push(ProgramItem {
+                                            instruction: Instruction::IntervalChar(
+                                                IntervalCharOptions {
+                                                    range: range_chars.clone(),
+                                                    can_repeat: false,
+                                                    is_optional: true,
+                                                },
+                                            ),
+                                            action: Action {
+                                                next: self.program.len() + 1 + start,
+                                                offset: 1,
+                                            },
+                                        });
+                                    }
+                                }
+                                Class::Bytes(_) => todo!(),
+                            },
+                            _ => {}
+                        },
                     },
                 }
             }
-            HirKind::Class(class) => match class {
-                Class::Unicode(set) => {
-                    let range_chars = set.ranges().to_owned();
-                    self.program.push(ProgramItem {
-                        instruction: Instruction::IntervalChar(range_chars),
-                        action: Action {
-                            next: self.program.len() + 1 + start,
-                            offset: 1,
-                        },
-                    })
+            HirKind::Class(class) => {
+                if !self.is_repetition {
+                    match class {
+                        Class::Unicode(set) => {
+                            let range_chars = set.ranges().to_owned();
+                            self.program.push(ProgramItem {
+                                instruction: Instruction::IntervalChar(IntervalCharOptions {
+                                    range: range_chars,
+                                    can_repeat: false,
+                                    is_optional: false,
+                                }),
+                                action: Action {
+                                    next: self.program.len() + 1 + start,
+                                    offset: 1,
+                                },
+                            });
+                        }
+                        Class::Bytes(_) => todo!(),
+                    }
                 }
-                Class::Bytes(_) => todo!(),
-            },
+            }
             HirKind::Group(_) => {}
             HirKind::WordBoundary(_) => {}
         }

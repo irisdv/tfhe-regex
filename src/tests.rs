@@ -253,7 +253,6 @@ fn alternation_should_succeed_2() {
     assert!(machine.run("aed42".to_string()));
 }
 
-
 #[test]
 fn alternation_should_fail() {
     let program = Compiler::compile(r"0a|bcd$");
@@ -288,4 +287,31 @@ fn alternation_string_numbered_matching_should_fail() {
     assert!(!machine.run("helabbc".to_string()));
     machine.reset();
     assert!(!machine.run("helllobc".to_string()));
+}
+
+#[test]
+fn repetition_with_range_should_succeed() {
+    let program = Compiler::compile(r"^01[b-e]{4}56$");
+    let mut machine = Machine::new(program);
+    assert!(machine.run("01bbbb56".to_string()));
+    machine.reset();
+    assert!(machine.run("01bcde56".to_string()));
+}
+
+#[test]
+fn repetition_with_range_should_fail() {
+    let program = Compiler::compile(r"^01[b-e]{4}56$");
+    let mut machine = Machine::new(program);
+    assert!(!machine.run("01bb56".to_string()));
+    machine.reset();
+    assert!(!machine.run("01bcfg56".to_string()));
+}
+
+#[test]
+fn repetition_with_range_should_succeed_1() {
+    let program = Compiler::compile(r"^hel(a[b-e]{2}|[l-n]{3,}o)bc$");
+    let mut machine = Machine::new(program);
+    assert!(machine.run("helacdbc".to_string()));
+    machine.reset();
+    assert!(machine.run("hellllobc".to_string()));
 }

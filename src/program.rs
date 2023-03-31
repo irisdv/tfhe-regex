@@ -2,13 +2,20 @@ use regex_syntax::hir::ClassUnicodeRange;
 use tfhe::shortint::{ciphertext::Ciphertext, ClientKey};
 
 #[derive(Debug, Clone)]
+pub struct IntervalCharOptions {
+    pub range: Vec<ClassUnicodeRange>,
+    pub can_repeat: bool,
+    pub is_optional: bool,
+}
+
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Char(u8),
     Match,            // Anchor end
     Start,            // Anchor start
     Repetition(u8),   // 0 to infinite repetition of a character
     OptionalChar(u8), // in case of bounded repetitions or ZeroOrOneRepetition
-    IntervalChar(Vec<ClassUnicodeRange>),
+    IntervalChar(IntervalCharOptions),
     Branch(usize), // context to fallback
     Jump(usize),
 }
@@ -22,8 +29,8 @@ pub struct CiphertextRange {
 #[derive(Clone)]
 pub enum CipherInstruction {
     CipherChar(Ciphertext),
-    Match,            // Anchor end
-    Start,            // Anchor start
+    Match, // Anchor end
+    Start, // Anchor start
     CipherRepetition(Ciphertext),
     CipherOptionalChar(Ciphertext),
     CipherIntervalChar(Vec<CiphertextRange>),
@@ -70,23 +77,33 @@ fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> Ci
             CipherInstruction::CipherOptionalChar(ct)
         }
         Instruction::IntervalChar(ranges) => {
-            let cipher_ranges = ranges.iter().map(|range| {
-                let start = client_key.encrypt(range.start() as u64);
-                let end = client_key.encrypt(range.end() as u64);
-                CiphertextRange {start: start, end: end}
-            }).collect();
+            let cipher_ranges = ranges
+                .range
+                .iter()
+                .map(|range| {
+                    let start = client_key.encrypt(range.start() as u64);
+                    let end = client_key.encrypt(range.end() as u64);
+                    CiphertextRange {
+                        start: start,
+                        end: end,
+                    }
+                })
+                .collect();
             CipherInstruction::CipherIntervalChar(cipher_ranges)
         }
         Instruction::Branch(pc) => CipherInstruction::Branch(pc),
         Instruction::Jump(pc) => CipherInstruction::Jump(pc),
     };
-    CipherProgramItem { instruction: instruction, action: program_item.action.clone() }
+    CipherProgramItem {
+        instruction: instruction,
+        action: program_item.action.clone(),
+    }
 }
 
 pub fn cipher_program(client_key: &ClientKey, program: Program) -> CipherProgram {
     let cipher_program = program
-    .iter()
-    .map(|program_item| cipher_program_item(client_key, program_item))
-    .collect();
+        .iter()
+        .map(|program_item| cipher_program_item(client_key, program_item))
+        .collect();
     cipher_program
 }

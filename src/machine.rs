@@ -114,28 +114,43 @@ impl Machine {
                 Instruction::IntervalChar(ranges) => {
                     let mut has_matched = false;
                     let result = input.as_bytes()[self.string_counter];
-                    for range in ranges.iter() {
+                    for range in ranges.range.iter() {
                         if range.start() as u8 <= result && result <= range.end() as u8 {
-                            // we're in the right range, it matches
-                            self.string_counter =
-                                (self.string_counter as i32 + current_item.action.offset) as usize;
-                            state = current_item.action.next;
-                            self.program_counter += 1;
                             has_matched = true;
                             break;
                         }
                     }
-                    if !has_matched {
-                        // If we're there then we haven't match anything yet
+                    if has_matched {
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                        if !ranges.can_repeat || ranges.is_optional {
+                            state = current_item.action.next;
+                            self.program_counter += 1;
+                        }
+                    } else if !has_matched && (ranges.is_optional || ranges.can_repeat) {
+                        state = current_item.action.next;
+                        self.program_counter += 1;
+                    } else if self.stack.is_empty() {
                         let prev_state = self.program_counter.saturating_sub(1);
                         let prev_item = self.program[prev_state].clone();
-                        state = prev_item.action.next;
-                        self.string_counter =
-                            (self.string_counter as i32 + prev_item.action.offset) as usize;
-                        self.program_counter = prev_state;
-                        if exact_match {
-                            return false;
+                        match prev_item.instruction {
+                            Instruction::Jump(_) => {
+                                return false;
+                            }
+                            _ => {
+                                state = prev_item.action.next;
+                                self.string_counter =
+                                    (self.string_counter as i32 + prev_item.action.offset) as usize;
+                                self.program_counter = prev_state;
+                                if exact_match {
+                                    return false;
+                                }
+                            }
                         }
+                    } else {
+                        let context = self.stack.pop().unwrap();
+                        self.program_counter = context.program_counter;
+                        self.string_counter = context.string_counter;
                     }
                 }
                 Instruction::Branch(pc) => {
@@ -154,4 +169,3 @@ impl Machine {
         true
     }
 }
-
