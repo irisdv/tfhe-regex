@@ -13,7 +13,7 @@ fn simple_string() {
 
 #[test]
 fn simple_string_end_matching_should_succeed() {
-    let program = Compiler::compile(r"abc");
+    let program = Compiler::compile(r"abc$");
     let mut machine = Machine::new(program);
     assert!(machine.run("123abc".to_string()));
 }
