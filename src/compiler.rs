@@ -2,7 +2,6 @@ use regex_syntax::hir::{
     visit, Anchor, Class, Hir, HirKind, Literal, RepetitionKind, RepetitionRange, Visitor,
 };
 use regex_syntax::Parser;
-use tfhe_regex::convert_char;
 
 use crate::program::{Action, Instruction, IntervalCharOptions, Program, ProgramItem};
 
@@ -57,7 +56,7 @@ impl Visitor for ProgramFactory {
                     match literal {
                         Literal::Unicode(c) => {
                             self.program.push(ProgramItem {
-                                instruction: Instruction::Char(convert_char(*c as u8)),
+                                instruction: Instruction::Char(*c as u8),
                                 action: Action {
                                     next: self.program.len() + 1 + start,
                                     offset: 1,
@@ -66,7 +65,7 @@ impl Visitor for ProgramFactory {
                         }
                         Literal::Byte(b) => {
                             self.program.push(ProgramItem {
-                                instruction: Instruction::Char(convert_char(*b)),
+                                instruction: Instruction::Char(*b),
                                 action: Action {
                                     next: self.program.len() + 1 + start,
                                     offset: 1,
@@ -125,12 +124,12 @@ impl Visitor for ProgramFactory {
                         HirKind::Literal(literal) => {
                             let (instruction, repetition) = match literal {
                                 Literal::Unicode(c) => (
-                                    Instruction::Char(convert_char(*c as u8)),
-                                    Instruction::Repetition(convert_char(*c as u8)),
+                                    Instruction::Char(*c as u8),
+                                    Instruction::Repetition(*c as u8),
                                 ),
                                 Literal::Byte(b) => (
-                                    Instruction::Char(convert_char(*b)),
-                                    Instruction::Repetition(convert_char(*b)),
+                                    Instruction::Char(*b as u8),
+                                    Instruction::Repetition(*b as u8),
                                 ),
                             };
                             self.program.push(ProgramItem {
@@ -182,9 +181,9 @@ impl Visitor for ProgramFactory {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
                                 Literal::Unicode(c) => {
-                                    Instruction::Repetition(convert_char(*c as u8))
+                                    Instruction::Repetition(*c as u8)
                                 }
-                                Literal::Byte(b) => Instruction::Repetition(convert_char(*b)),
+                                Literal::Byte(b) => Instruction::Repetition(*b),
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -217,9 +216,9 @@ impl Visitor for ProgramFactory {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
                                 Literal::Unicode(c) => {
-                                    Instruction::OptionalChar(convert_char(*c as u8))
+                                    Instruction::OptionalChar(*c as u8)
                                 }
-                                Literal::Byte(b) => Instruction::OptionalChar(convert_char(*b)),
+                                Literal::Byte(b) => Instruction::OptionalChar(*b),
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -253,9 +252,9 @@ impl Visitor for ProgramFactory {
                             HirKind::Literal(literal) => {
                                 let instruction = match literal {
                                     Literal::Unicode(c) => {
-                                        Instruction::Char(convert_char(*c as u8))
+                                        Instruction::Char(*c as u8)
                                     }
-                                    Literal::Byte(b) => Instruction::Char(convert_char(*b)),
+                                    Literal::Byte(b) => Instruction::Char(*b),
                                 };
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
@@ -294,12 +293,12 @@ impl Visitor for ProgramFactory {
                             HirKind::Literal(literal) => {
                                 let (instruction, repetition) = match literal {
                                     Literal::Unicode(c) => (
-                                        Instruction::Char(convert_char(*c as u8)),
-                                        Instruction::Repetition(convert_char(*c as u8)),
+                                        Instruction::Char(*c as u8),
+                                        Instruction::Repetition(*c as u8),
                                     ),
                                     Literal::Byte(b) => (
-                                        Instruction::Char(convert_char(*b)),
-                                        Instruction::Repetition(convert_char(*b)),
+                                        Instruction::Char(*b),
+                                        Instruction::Repetition(*b),
                                     ),
                                 };
                                 for _i in 0..n {
@@ -359,12 +358,12 @@ impl Visitor for ProgramFactory {
                             HirKind::Literal(literal) => {
                                 let (instruction, optional_char) = match literal {
                                     Literal::Unicode(c) => (
-                                        Instruction::Char(convert_char(*c as u8)),
-                                        Instruction::OptionalChar(convert_char(*c as u8)),
+                                        Instruction::Char(*c as u8),
+                                        Instruction::OptionalChar(*c as u8),
                                     ),
                                     Literal::Byte(b) => (
-                                        Instruction::Char(convert_char(*b)),
-                                        Instruction::OptionalChar(convert_char(*b)),
+                                        Instruction::Char(*b),
+                                        Instruction::OptionalChar(*b),
                                     ),
                                 };
                                 for _i in 0..m {

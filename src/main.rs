@@ -1,4 +1,5 @@
 use tfhe::shortint::prelude::*;
+use tfhe_regex::{EncodedCipher4bits, EncodedCipherTrait};
 
 pub mod compiler;
 pub mod machine;
@@ -11,13 +12,16 @@ mod tests;
 #[cfg(test)]
 mod tfhe_machine_tests;
 
+#[cfg(test)]
+mod encoded_cipher_tests;
+
 struct CheckerCipher {
     client_key: ClientKey,
 }
 
 impl tfhe_machine::CheckerCipherTrait for CheckerCipher {
-    fn is_true(&self, ct_lower: &Ciphertext, ct_upper: &Ciphertext) -> bool {
-        self.client_key.decrypt(ct_lower) == 1_u64 && self.client_key.decrypt(ct_upper) == 1_u64
+    fn is_true(&self, ct_result: &Ciphertext) -> bool {
+        self.client_key.decrypt(ct_result) != 0_u64
     }
 }
 
@@ -30,16 +34,14 @@ fn main() {
     let program = compiler::Compiler::compile(r"^hel(ab{2}|l{3,}o)bc$");
     let program = program::cipher_program(&client_key, program);
 
-    let input: Vec<[Ciphertext; 2]> = "helllllllobc"
+    let input: Vec<EncodedCipher4bits> = "helllllllobc"
         .chars()
         .map(|c| {
-            let lower = client_key.encrypt(((c as u8) & 0x0F) as u64);
-            let upper = client_key.encrypt((((c as u8) >> 4) & 0x0F) as u64);
-            [lower, upper]
+            EncodedCipher4bits::encrypt(&client_key, c as u8)
         })
         .collect();
 
-    let mut machine = tfhe_machine::TFHEMachine::new(program, server_key);
+    let mut machine = tfhe_machine::TFHEMachine::<EncodedCipher4bits>::new(program, server_key);
     let result = machine.run(input, &checker);
     println!("Result: {}", result);
 }
