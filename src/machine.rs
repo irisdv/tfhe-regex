@@ -1,3 +1,5 @@
+use tfhe_regex::convert_char;
+
 use crate::program::{Instruction, Program};
 
 #[derive(Default, Clone, Debug)]
@@ -48,7 +50,8 @@ impl Machine {
                     if self.string_counter >= input.len() {
                         return false;
                     }
-                    let result = input.as_bytes()[self.string_counter] == c;
+                    let input_char = convert_char(input.as_bytes()[self.string_counter]);
+                    let result = input_char == c;
                     if !result {
                         if self.stack.is_empty() {
                             // Failed match, backtrack to previous state
@@ -91,7 +94,8 @@ impl Machine {
                     exact_match = true;
                 }
                 Instruction::Repetition(c) => {
-                    let result = input.as_bytes()[self.string_counter] == c;
+                    let input_char = convert_char(input.as_bytes()[self.string_counter]);
+                    let result = input_char == c;
                     if result {
                         self.string_counter =
                             (self.string_counter as i32 + current_item.action.offset) as usize;
@@ -101,7 +105,8 @@ impl Machine {
                     }
                 }
                 Instruction::OptionalChar(c) => {
-                    let result = input.as_bytes()[self.string_counter] == c;
+                    let input_char = convert_char(input.as_bytes()[self.string_counter]);
+                    let result = input_char == c;
                     if result {
                         // if it matches we will go next character of the string
                         self.string_counter =

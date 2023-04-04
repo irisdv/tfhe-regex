@@ -19,30 +19,32 @@ pub struct TFHEMachine {
 }
 
 pub trait CheckerCipherTrait {
-    fn is_true(&self, ct: &Ciphertext) -> bool;
+    fn is_true(&self, ct_lower: &Ciphertext, ct_upper: &Ciphertext) -> bool;
 }
 
 impl TFHEMachine {
     pub fn ct_are_equal(
         &self,
         checker: &impl CheckerCipherTrait,
-        ct_left: &Ciphertext,
-        ct_right: &Ciphertext,
+        ct_left: [Ciphertext; 2],
+        ct_right: [Ciphertext; 2],
     ) -> bool {
-        let ct_result = self.server_key.unchecked_equal(ct_left, ct_right);
-        checker.is_true(&ct_result)
+        let ct_result_lower = self.server_key.unchecked_equal(&ct_left[0], &ct_right[0]);
+        let ct_result_upper = self.server_key.unchecked_equal(&ct_left[1], &ct_right[1]);
+        checker.is_true(&ct_result_lower, &ct_result_upper)
     }
     pub fn ct_in_range(
         &self,
         checker: &impl CheckerCipherTrait,
-        ct_value: &Ciphertext,
-        ct_start: &Ciphertext,
-        ct_end: &Ciphertext,
+        ct_value: [Ciphertext; 2],
+        ct_start: [Ciphertext; 2],
+        ct_end: [Ciphertext; 2],
     ) -> bool {
-        let ct_greater = self.server_key.unchecked_greater_or_equal(ct_value, ct_start);
-        let ct_less = self.server_key.unchecked_less_or_equal(ct_value, ct_end);
-        let ct_result = self.server_key.unchecked_mul_lsb(&ct_less, &ct_greater);
-        checker.is_true(&ct_result)
+        // let ct_greater = self.server_key.unchecked_greater_or_equal(ct_value, ct_start);
+        // let ct_less = self.server_key.unchecked_less_or_equal(ct_value, ct_end);
+        // let ct_result = self.server_key.unchecked_mul_lsb(&ct_less, &ct_greater);
+        // checker.is_true(&ct_result)
+        true
     }
     pub fn new(program: CipherProgram, server_key: ServerKey) -> Self {
         Self {
@@ -60,7 +62,7 @@ impl TFHEMachine {
         self.stack = Stack::new();
     }
 
-    pub fn run(&mut self, input: Vec<Ciphertext>, checker: &impl CheckerCipherTrait) -> bool {
+    pub fn run(&mut self, input: Vec<[Ciphertext; 2]>, checker: &impl CheckerCipherTrait) -> bool {
         let mut state = 0;
         let mut exact_match = false;
 
@@ -78,7 +80,7 @@ impl TFHEMachine {
                         return false;
                     }
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, ct_input, ct);
                     if !result {
                         if self.stack.is_empty() {
                             // Failed match, backtrack to previous state
@@ -122,7 +124,7 @@ impl TFHEMachine {
                 }
                 CipherInstruction::CipherRepetition(ct) => {
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, ct_input, ct);
                     if result {
                         self.string_counter =
                             (self.string_counter as i32 + current_item.action.offset) as usize;
@@ -133,7 +135,7 @@ impl TFHEMachine {
                 }
                 CipherInstruction::CipherOptionalChar(ct) => {
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, &ct_input, &ct);
+                    let result = self.ct_are_equal(checker, ct_input, ct);
                     if result {
                         // if it matches we will go next character of the string
                         self.string_counter =
@@ -146,28 +148,49 @@ impl TFHEMachine {
                 CipherInstruction::CipherIntervalChar(ranges) => {
                     let mut has_matched = false;
                     let ct_input = input[self.string_counter].clone();
-                    for range in ranges.iter() {
-                        if self.ct_in_range(checker, &ct_input, &range.start, &range.end) {
+                    for range in ranges.range.iter() {
+                        if self.ct_in_range(
+                            checker,
+                            ct_input.clone(),
+                            range.start.clone(),
+                            range.end.clone(),
+                        ) {
                             // we're in the right range, it matches
-                            self.string_counter =
-                                (self.string_counter as i32 + current_item.action.offset) as usize;
-                            state = current_item.action.next;
-                            self.program_counter += 1;
                             has_matched = true;
                             break;
                         }
                     }
-                    if !has_matched {
-                        // If we're there then we haven't match anything yet
+                    if has_matched {
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                        if !ranges.can_repeat || ranges.is_optional {
+                            state = current_item.action.next;
+                            self.program_counter += 1;
+                        }
+                    } else if !has_matched && (ranges.is_optional || ranges.can_repeat) {
+                        state = current_item.action.next;
+                        self.program_counter += 1;
+                    } else if self.stack.is_empty() {
                         let prev_state = self.program_counter.saturating_sub(1);
                         let prev_item = self.program[prev_state].clone();
-                        state = prev_item.action.next;
-                        self.string_counter =
-                            (self.string_counter as i32 + prev_item.action.offset) as usize;
-                        self.program_counter = prev_state;
-                        if exact_match {
-                            return false;
+                        match prev_item.instruction {
+                            CipherInstruction::Jump(_) => {
+                                return false;
+                            }
+                            _ => {
+                                state = prev_item.action.next;
+                                self.string_counter =
+                                    (self.string_counter as i32 + prev_item.action.offset) as usize;
+                                self.program_counter = prev_state;
+                                if exact_match {
+                                    return false;
+                                }
+                            }
                         }
+                    } else {
+                        let context = self.stack.pop().unwrap();
+                        self.program_counter = context.program_counter;
+                        self.string_counter = context.string_counter;
                     }
                 }
                 CipherInstruction::Branch(pc) => {
