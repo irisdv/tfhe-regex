@@ -103,10 +103,46 @@ impl EncodedCipherTrait for EncodedCipher2bits {
     }
 
     fn greater_or_equal(self, server_key: &ServerKey, rhs: Self) -> Ciphertext {
-        todo!()
+        // (Ai > Bi) + (Ai == Bi) *
+        //          (Aj > Bj) + (Aj == Bj) *
+        //                  (Ak > Bk) + (Ak == Bk) *
+        //                          (Al >= Bl) 
+        let result_i = server_key.unchecked_greater(&self.i, &rhs.i);
+        let result_i_equal = server_key.unchecked_equal(&self.i, &rhs.i);
+        let result_j = server_key.unchecked_greater(&self.j, &rhs.j);
+        let result_j_equal = server_key.unchecked_equal(&self.j, &rhs.j);
+        let result_k = server_key.unchecked_greater(&self.k, &rhs.k);
+        let result_k_equal = server_key.unchecked_equal(&self.k, &rhs.k);
+        let result_l = server_key.unchecked_greater_or_equal(&self.l, &rhs.l);
+
+        let result = server_key.unchecked_mul_lsb(&result_k_equal, &result_l);
+        let result = server_key.unchecked_add(&result_k, &result);
+        let result = server_key.unchecked_mul_lsb(&result_j_equal, &result);
+        let result = server_key.unchecked_add(&result_j, &result);
+        let result = server_key.smart_scalar_greater_or_equal(&result, 1_u8);
+        let result = server_key.unchecked_mul_lsb(&result_i_equal, &result);
+        server_key.unchecked_add(&result_i, &result)
     }
 
     fn less_or_equal(self, server_key: &ServerKey, rhs: Self) -> Ciphertext {
-        todo!()
+        // (Ai < Bi) + (Ai == Bi) *
+        //          (Aj < Bj) + (Aj == Bj) *
+        //                  (Ak < Bk) + (Ak == Bk) *
+        //                          (Al <= Bl) 
+        let result_i = server_key.unchecked_less(&self.i, &rhs.i);
+        let result_i_equal = server_key.unchecked_equal(&self.i, &rhs.i);
+        let result_j = server_key.unchecked_less(&self.j, &rhs.j);
+        let result_j_equal = server_key.unchecked_equal(&self.j, &rhs.j);
+        let result_k = server_key.unchecked_less(&self.k, &rhs.k);
+        let result_k_equal = server_key.unchecked_equal(&self.k, &rhs.k);
+        let result_l = server_key.unchecked_less_or_equal(&self.l, &rhs.l);
+
+        let result = server_key.unchecked_mul_lsb(&result_k_equal, &result_l);
+        let result = server_key.unchecked_add(&result_k, &result);
+        let result = server_key.unchecked_mul_lsb(&result_j_equal, &result);
+        let result = server_key.unchecked_add(&result_j, &result);
+        let result = server_key.smart_scalar_greater_or_equal(&result, 1_u8);
+        let result = server_key.unchecked_mul_lsb(&result_i_equal, &result);
+        server_key.unchecked_add(&result_i, &result)
     }
 }

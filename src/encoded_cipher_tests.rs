@@ -18,8 +18,8 @@ fn get_keys() -> Result<(ClientKey, ServerKey, CheckerCipher), String> {
 
 #[test]
 fn check_encrypt_decrypt() {
-    let (client_key, server_key, _) = get_keys().unwrap();
-    for (value) in [1_u8, 245_u8, 56_u8, 67_u8, 23_u8, 69_u8, 52_u8, 123_u8, 59_u8] {
+    let (client_key, _, _) = get_keys().unwrap();
+    for value in [1_u8, 245_u8, 56_u8, 67_u8, 23_u8, 69_u8, 52_u8, 123_u8, 59_u8] {
         let cipher = TestEncodedCipher::encrypt(&client_key, value);
         let result = cipher.decrypt(&client_key);
         assert!(value == result);
