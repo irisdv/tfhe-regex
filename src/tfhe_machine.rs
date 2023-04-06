@@ -1,4 +1,5 @@
 use tfhe::shortint::{ciphertext::Ciphertext, ServerKey};
+use tfhe_regex::EncodedCipherTrait;
 
 use crate::program::{CipherInstruction, CipherProgram};
 
@@ -10,43 +11,35 @@ struct Context {
 
 type Stack = Vec<Context>;
 
-pub struct TFHEMachine {
+pub struct TFHEMachine<T: EncodedCipherTrait + Clone> {
     program_counter: usize,
     string_counter: usize,
-    program: CipherProgram,
+    program: CipherProgram<T>,
     stack: Stack,
     server_key: ServerKey,
 }
 
 pub trait CheckerCipherTrait {
-    fn is_true(&self, ct_lower: &Ciphertext, ct_upper: &Ciphertext) -> bool;
+    fn is_true(&self, ct_result: &Ciphertext) -> bool;
 }
 
-impl TFHEMachine {
-    pub fn ct_are_equal(
-        &self,
-        checker: &impl CheckerCipherTrait,
-        ct_left: [Ciphertext; 2],
-        ct_right: [Ciphertext; 2],
-    ) -> bool {
-        let ct_result_lower = self.server_key.unchecked_equal(&ct_left[0], &ct_right[0]);
-        let ct_result_upper = self.server_key.unchecked_equal(&ct_left[1], &ct_right[1]);
-        checker.is_true(&ct_result_lower, &ct_result_upper)
+impl<T> TFHEMachine<T>
+where
+    T: EncodedCipherTrait + Clone,
+{
+    fn ct_are_equal(&self, checker: &impl CheckerCipherTrait, left: T, right: T) -> bool {
+        let result = left.equal(&self.server_key, right);
+        checker.is_true(&result)
     }
-    pub fn ct_in_range(
-        &self,
-        checker: &impl CheckerCipherTrait,
-        ct_value: [Ciphertext; 2],
-        ct_start: [Ciphertext; 2],
-        ct_end: [Ciphertext; 2],
-    ) -> bool {
-        // let ct_greater = self.server_key.unchecked_greater_or_equal(ct_value, ct_start);
-        // let ct_less = self.server_key.unchecked_less_or_equal(ct_value, ct_end);
-        // let ct_result = self.server_key.unchecked_mul_lsb(&ct_less, &ct_greater);
-        // checker.is_true(&ct_result)
-        true
+
+    fn ct_in_range(&self, checker: &impl CheckerCipherTrait, value: T, start: T, end: T) -> bool {
+        let greater = value.clone().greater_or_equal(&self.server_key, start);
+        let less = value.less_or_equal(&self.server_key, end);
+        let result = self.server_key.unchecked_mul_lsb(&less, &greater);
+        checker.is_true(&result)
     }
-    pub fn new(program: CipherProgram, server_key: ServerKey) -> Self {
+
+    pub fn new(program: CipherProgram<T>, server_key: ServerKey) -> Self {
         Self {
             program_counter: 0,
             string_counter: 0,
@@ -62,7 +55,7 @@ impl TFHEMachine {
         self.stack = Stack::new();
     }
 
-    pub fn run(&mut self, input: Vec<[Ciphertext; 2]>, checker: &impl CheckerCipherTrait) -> bool {
+    pub fn run(&mut self, input: Vec<T>, checker: &impl CheckerCipherTrait) -> bool {
         let mut state = 0;
         let mut exact_match = false;
 

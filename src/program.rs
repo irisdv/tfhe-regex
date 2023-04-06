@@ -1,6 +1,6 @@
 use regex_syntax::hir::ClassUnicodeRange;
-use tfhe::shortint::{ciphertext::Ciphertext, ClientKey};
-use tfhe_regex::convert_char;
+use tfhe::shortint::ClientKey;
+use tfhe_regex::EncodedCipherTrait;
 
 #[derive(Debug, Clone)]
 pub struct IntervalCharOptions {
@@ -11,37 +11,37 @@ pub struct IntervalCharOptions {
 
 #[derive(Debug, Clone)]
 pub enum Instruction {
-    Char([u8; 2]),
+    Char(u8),
     Match,                 // Anchor end
     Start,                 // Anchor start
-    Repetition([u8; 2]),   // 0 to infinite repetition of a character
-    OptionalChar([u8; 2]), // in case of bounded repetitions or ZeroOrOneRepetition
+    Repetition(u8),   // 0 to infinite repetition of a character
+    OptionalChar(u8), // in case of bounded repetitions or ZeroOrOneRepetition
     IntervalChar(IntervalCharOptions),
     Branch(usize), // context to fallback
     Jump(usize),
 }
 
 #[derive(Clone)]
-pub struct CiphertextRange {
-    pub start: [Ciphertext; 2],
-    pub end: [Ciphertext; 2],
+pub struct CiphertextRange<T> {
+    pub start: T,
+    pub end: T,
 }
 
 #[derive(Clone)]
-pub struct CipherIntervalCharOptions {
-    pub range: Vec<CiphertextRange>,
+pub struct CipherIntervalCharOptions<T> {
+    pub range: Vec<CiphertextRange<T>>,
     pub can_repeat: bool,
     pub is_optional: bool,
 }
 
 #[derive(Clone)]
-pub enum CipherInstruction {
-    CipherChar([Ciphertext; 2]),
+pub enum CipherInstruction<T:EncodedCipherTrait+Clone> {
+    CipherChar(T),
     Match, // Anchor end
     Start, // Anchor start
-    CipherRepetition([Ciphertext; 2]),
-    CipherOptionalChar([Ciphertext; 2]),
-    CipherIntervalChar(CipherIntervalCharOptions),
+    CipherRepetition(T),
+    CipherOptionalChar(T),
+    CipherIntervalChar(CipherIntervalCharOptions<T>),
     Branch(usize), // context to fallback
     Jump(usize),
 }
@@ -61,53 +61,38 @@ pub struct ProgramItem {
 pub type Program = Vec<ProgramItem>;
 
 #[derive(Clone)]
-pub struct CipherProgramItem {
-    pub instruction: CipherInstruction,
+pub struct CipherProgramItem<T:EncodedCipherTrait+Clone> {
+    pub instruction: CipherInstruction<T>,
     pub action: Action,
 }
 
-pub type CipherProgram = Vec<CipherProgramItem>;
+pub type CipherProgram<T> = Vec<CipherProgramItem<T>>;
 
-fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> CipherProgramItem {
-    let instruction: CipherInstruction = match program_item.instruction.clone() {
+fn cipher_program_item<T:EncodedCipherTrait+Clone>(client_key: &ClientKey, program_item: &ProgramItem) -> CipherProgramItem<T> {
+    let instruction: CipherInstruction<T> = match program_item.instruction.clone() {
         Instruction::Char(c) => {
-            let ct: [Ciphertext; 2] = [
-                client_key.encrypt(c[0] as u64),
-                client_key.encrypt(c[1] as u64),
-            ];
+            let ct = T::encrypt(client_key, c);
             CipherInstruction::CipherChar(ct)
         }
         Instruction::Match => CipherInstruction::Match,
         Instruction::Start => CipherInstruction::Start,
         Instruction::Repetition(c) => {
-            let ct: [Ciphertext; 2] = [
-                client_key.encrypt(c[0] as u64),
-                client_key.encrypt(c[1] as u64),
-            ];
+            let ct = T::encrypt(client_key, c);
             CipherInstruction::CipherRepetition(ct)
         }
         Instruction::OptionalChar(c) => {
-            let ct: [Ciphertext; 2] = [
-                client_key.encrypt(c[0] as u64),
-                client_key.encrypt(c[1] as u64),
-            ];
+            let ct = T::encrypt(client_key, c);
             CipherInstruction::CipherOptionalChar(ct)
         }
         Instruction::IntervalChar(ranges) => {
-            let cipher_ranges: Vec<CiphertextRange> = ranges
+            let cipher_ranges: Vec<CiphertextRange<T>> = ranges
                 .range
                 .iter()
                 .map(|range| {
-                    let start = convert_char(range.start() as u8);
-                    let start_ct = [
-                        client_key.encrypt(start[0] as u64),
-                        client_key.encrypt(start[1] as u64),
-                    ];
-                    let end = convert_char(range.end() as u8);
-                    let end_ct = [
-                        client_key.encrypt(end[0] as u64),
-                        client_key.encrypt(end[1] as u64),
-                    ];
+                    let start = range.start() as u8;
+                    let start_ct = T::encrypt(client_key, start);
+                    let end = range.end() as u8;
+                    let end_ct = T::encrypt(client_key, end);
                     CiphertextRange {
                         start: start_ct,
                         end: end_ct,
@@ -129,7 +114,7 @@ fn cipher_program_item(client_key: &ClientKey, program_item: &ProgramItem) -> Ci
     }
 }
 
-pub fn cipher_program(client_key: &ClientKey, program: Program) -> CipherProgram {
+pub fn cipher_program<T:EncodedCipherTrait+Clone>(client_key: &ClientKey, program: Program) -> CipherProgram<T> {
     let cipher_program = program
         .iter()
         .map(|program_item| cipher_program_item(client_key, program_item))
