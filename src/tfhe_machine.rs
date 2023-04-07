@@ -73,9 +73,12 @@ where
                         return false;
                     }
                     let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, ct_input, ct);
+                    let result = self.ct_are_equal(checker, ct_input, ct.char);
                     if !result {
-                        if self.stack.is_empty() {
+                        if ct.can_repeat || ct.is_optional {
+                            state = current_item.action.next;
+                            self.program_counter += 1;
+                        } else if self.stack.is_empty() {
                             // Failed match, backtrack to previous state
                             let prev_state = self.program_counter.saturating_sub(1);
                             let prev_item = self.program[prev_state].clone();
@@ -99,6 +102,16 @@ where
                             self.program_counter = context.program_counter;
                             self.string_counter = context.string_counter;
                         }
+                    } else if ct.can_repeat && !ct.is_optional {
+                        // char can be repeated
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                    } else if !ct.can_repeat && ct.is_optional {
+                        // char is optional
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                        state = current_item.action.next;
+                        self.program_counter += 1;
                     } else {
                         // Successful match, advance to next state
                         state = current_item.action.next;
@@ -114,29 +127,6 @@ where
                 CipherInstruction::Start => {
                     self.program_counter += 1;
                     exact_match = true;
-                }
-                CipherInstruction::CipherRepetition(ct) => {
-                    let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, ct_input, ct);
-                    if result {
-                        self.string_counter =
-                            (self.string_counter as i32 + current_item.action.offset) as usize;
-                    } else {
-                        state = current_item.action.next;
-                        self.program_counter += 1;
-                    }
-                }
-                CipherInstruction::CipherOptionalChar(ct) => {
-                    let ct_input = input[self.string_counter].clone();
-                    let result = self.ct_are_equal(checker, ct_input, ct);
-                    if result {
-                        // if it matches we will go next character of the string
-                        self.string_counter =
-                            (self.string_counter as i32 + current_item.action.offset) as usize;
-                    }
-                    // if it doesn't match then we stay at the same sc but fo on pc right to the next state and next instruction
-                    state = current_item.action.next;
-                    self.program_counter += 1;
                 }
                 CipherInstruction::CipherIntervalChar(ranges) => {
                     let mut has_matched = false;

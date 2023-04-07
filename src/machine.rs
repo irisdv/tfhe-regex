@@ -49,9 +49,12 @@ impl Machine {
                         return false;
                     }
                     let input_char = input.as_bytes()[self.string_counter];
-                    let result = input_char == c;
+                    let result = input_char == c.char;
                     if !result {
-                        if self.stack.is_empty() {
+                        if c.can_repeat || c.is_optional {
+                            state = current_item.action.next;
+                            self.program_counter += 1;
+                        } else if self.stack.is_empty() {
                             // Failed match, backtrack to previous state
                             let prev_state = self.program_counter.saturating_sub(1);
                             let prev_item = self.program[prev_state].clone();
@@ -75,6 +78,16 @@ impl Machine {
                             self.program_counter = context.program_counter;
                             self.string_counter = context.string_counter;
                         }
+                    } else if c.can_repeat && !c.is_optional {
+                        // char can be repeated
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                    } else if !c.can_repeat && c.is_optional {
+                        // char is optional
+                        self.string_counter =
+                            (self.string_counter as i32 + current_item.action.offset) as usize;
+                        state = current_item.action.next;
+                        self.program_counter += 1;
                     } else {
                         // Successful match, advance to next state
                         state = current_item.action.next;
@@ -90,29 +103,6 @@ impl Machine {
                 Instruction::Start => {
                     self.program_counter += 1;
                     exact_match = true;
-                }
-                Instruction::Repetition(c) => {
-                    let input_char = input.as_bytes()[self.string_counter];
-                    let result = input_char == c;
-                    if result {
-                        self.string_counter =
-                            (self.string_counter as i32 + current_item.action.offset) as usize;
-                    } else {
-                        state = current_item.action.next;
-                        self.program_counter += 1;
-                    }
-                }
-                Instruction::OptionalChar(c) => {
-                    let input_char = input.as_bytes()[self.string_counter];
-                    let result = input_char == c;
-                    if result {
-                        // if it matches we will go next character of the string
-                        self.string_counter =
-                            (self.string_counter as i32 + current_item.action.offset) as usize;
-                    }
-                    // if it doesn't match then we stay at the same sc but fo on pc right to the next state and next instruction
-                    state = current_item.action.next;
-                    self.program_counter += 1;
                 }
                 Instruction::IntervalChar(ranges) => {
                     let mut has_matched = false;
