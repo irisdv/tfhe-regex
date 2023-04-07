@@ -14,22 +14,12 @@ impl Compiler {
     }
 }
 
+#[derive(Default)]
 struct ProgramFactory {
     program: Program,
     is_repetition: bool,
     branch_counter: usize,
     jump_counter: usize,
-}
-
-impl Default for ProgramFactory {
-    fn default() -> Self {
-        Self {
-            program: Vec::new(),
-            is_repetition: false,
-            branch_counter: 0,
-            jump_counter: 0,
-        }
-    }
 }
 
 impl Visitor for ProgramFactory {
@@ -127,10 +117,9 @@ impl Visitor for ProgramFactory {
                                     Instruction::Char(*c as u8),
                                     Instruction::Repetition(*c as u8),
                                 ),
-                                Literal::Byte(b) => (
-                                    Instruction::Char(*b as u8),
-                                    Instruction::Repetition(*b as u8),
-                                ),
+                                Literal::Byte(b) => {
+                                    (Instruction::Char(*b), Instruction::Repetition(*b))
+                                }
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -180,9 +169,7 @@ impl Visitor for ProgramFactory {
                     RepetitionKind::ZeroOrMore => match repetition.hir.kind() {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
-                                Literal::Unicode(c) => {
-                                    Instruction::Repetition(*c as u8)
-                                }
+                                Literal::Unicode(c) => Instruction::Repetition(*c as u8),
                                 Literal::Byte(b) => Instruction::Repetition(*b),
                             };
                             self.program.push(ProgramItem {
@@ -215,9 +202,7 @@ impl Visitor for ProgramFactory {
                     RepetitionKind::ZeroOrOne => match repetition.hir.kind() {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
-                                Literal::Unicode(c) => {
-                                    Instruction::OptionalChar(*c as u8)
-                                }
+                                Literal::Unicode(c) => Instruction::OptionalChar(*c as u8),
                                 Literal::Byte(b) => Instruction::OptionalChar(*b),
                             };
                             self.program.push(ProgramItem {
@@ -251,9 +236,7 @@ impl Visitor for ProgramFactory {
                         RepetitionRange::Exactly(n) => match repetition.hir.kind() {
                             HirKind::Literal(literal) => {
                                 let instruction = match literal {
-                                    Literal::Unicode(c) => {
-                                        Instruction::Char(*c as u8)
-                                    }
+                                    Literal::Unicode(c) => Instruction::Char(*c as u8),
                                     Literal::Byte(b) => Instruction::Char(*b),
                                 };
                                 for _i in 0..n {
@@ -296,10 +279,9 @@ impl Visitor for ProgramFactory {
                                         Instruction::Char(*c as u8),
                                         Instruction::Repetition(*c as u8),
                                     ),
-                                    Literal::Byte(b) => (
-                                        Instruction::Char(*b),
-                                        Instruction::Repetition(*b),
-                                    ),
+                                    Literal::Byte(b) => {
+                                        (Instruction::Char(*b), Instruction::Repetition(*b))
+                                    }
                                 };
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
@@ -361,10 +343,9 @@ impl Visitor for ProgramFactory {
                                         Instruction::Char(*c as u8),
                                         Instruction::OptionalChar(*c as u8),
                                     ),
-                                    Literal::Byte(b) => (
-                                        Instruction::Char(*b),
-                                        Instruction::OptionalChar(*b),
-                                    ),
+                                    Literal::Byte(b) => {
+                                        (Instruction::Char(*b), Instruction::OptionalChar(*b))
+                                    }
                                 };
                                 for _i in 0..m {
                                     self.program.push(ProgramItem {

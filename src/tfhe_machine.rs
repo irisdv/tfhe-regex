@@ -45,7 +45,7 @@ where
             string_counter: 0,
             program,
             stack: Stack::new(),
-            server_key: server_key,
+            server_key,
         }
     }
 

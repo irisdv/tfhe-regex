@@ -4,10 +4,9 @@ use crate::{
     CheckerCipher,
 };
 use tfhe::shortint::prelude::*;
-use tfhe_regex::{convert_str_to_cts, EncodedCipher2bits, EncodedCipher4bits};
+use tfhe_regex::{convert_str_to_cts, EncodedCipher2bits};
 
 type TestEncodedCipher = EncodedCipher2bits;
-
 
 fn get_keys() -> Result<(ClientKey, ServerKey, CheckerCipher), String> {
     let (client_key, server_key) = gen_keys(Parameters::default());
