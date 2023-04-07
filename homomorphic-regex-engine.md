@@ -183,18 +183,18 @@ fn main() {
 
 Now that we have a first implementation of a state machine for a simple test case, let's expand it so it can handle more features.
 
-#### A more complex Regex state machine
+### A more complex Regex state machine
 
 We started using two simple Instructions : `Char` and `Match`.
 
 To have a full implementation of a regex engine, we will need additional instructions.
 
-- Char: a character that can be repeated or optional.
-- IntervalChar: a range of characters that can be repeated or optional
-- Start: instruction to specify if the beginning of the string should match exactly
-- Match: instruction to specify that we can stop the program if it has matched exactly
-- Branch: in case of alternative matching, specify multiple possible paths that the program will test one after the other
-- Jump: to set the program counter to a new value. It will be used in case of alternations
+- `Char`: a character that can be repeated or optional.
+- `IntervalChar`: a range of characters that can be repeated or optional
+- `Start`: instruction to specify if the beginning of the string should match exactly
+- `Match`: instruction to specify that we can stop the program if it has matched exactly
+- `Branch`: in case of alternative matching, specify multiple possible paths that the program will test one after the other
+- `Jump`: to set the program counter to a new value. It will be used in case of alternations
 
 Each instruction will maintain an action struct where `next` represent the next state of the program to go to and `offset` .... In case we need to jump to another instruction or go back in the strings those two variables will help us achieve this.
 
