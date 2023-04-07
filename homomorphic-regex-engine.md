@@ -185,9 +185,7 @@ Now that we have a first implementation of a state machine for a simple test cas
 
 ### A more complex Regex state machine
 
-We started using two simple Instructions : `Char` and `Match`.
-
-To have a full implementation of a regex engine, we will need additional instructions.
+We started using two simple Instructions : `Char` and `Match`. To have a full implementation of a regex engine, we will need additional instructions.
 
 - `Char`: a character that can be repeated or optional.
 - `IntervalChar`: a range of characters that can be repeated or optional
@@ -196,7 +194,7 @@ To have a full implementation of a regex engine, we will need additional instruc
 - `Branch`: in case of alternative matching, specify multiple possible paths that the program will test one after the other
 - `Jump`: to set the program counter to a new value. It will be used in case of alternations
 
-Each instruction will maintain an action struct where `next` represent the next state of the program to go to and `offset` .... In case we need to jump to another instruction or go back in the strings those two variables will help us achieve this.
+Each instruction will maintain an action struct where `next` represents the next state of the program the machine needs to go to and `offset` the number of instructions we offset the program counter when we advance state. Those two variables will be important in case we need to jump to another instruction or go back in the string.
 
 ```
 pub struct Action {
@@ -205,8 +203,10 @@ pub struct Action {
 }
 ```
 
-....
+With those additional instructions we'll be able to handle more complexe cases. Exact matching of a string using `Start` and `Match`. An alternative matching containing optional chars and ranges of characters using `Char`, `IntervalChar`, `Branch`, `Jump`, etc.
 
-You can check the full implementation of all of these instructions [here](https://#).
+Full definition of the instructions are [here](https://#).
+
+#### Compiler
 
 ## Homomorphic Regex Engine
