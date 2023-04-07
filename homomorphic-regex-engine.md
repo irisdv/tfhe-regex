@@ -26,7 +26,7 @@ The tutorial covers :
 
 First we'll start by creating a new Rust project called `tfhe-regex` by running:
 
-```
+```bash
 cargo new tfhe-regex
 ```
 
@@ -62,7 +62,7 @@ We'll have a compiler which will convert the regular expression into a program, 
 
 Let's declare an Instruction enum. This enum defines two instructions: `Char` and `Match`. The `Char` instruction is used to match a character in the input string, while the `Match` instruction is used to signify the end of the input string.
 
-```
+```rust
 #[derive(Debug)]
 pub enum Instruction {
     Char(u8),
@@ -72,13 +72,13 @@ pub enum Instruction {
 
 Next, we have the `Program` type, which is just a vector of `Instruction`. This is the program that the machine will execute.
 
-```
+```rust
 pub type Program = Vec<Instruction>;
 ```
 
 Let's start by creating a `ProgramFactory` struct. It's a visitor that generates the program from the high-level intermediate representation (HIR) of the regex. It is implemented using the Visitor trait from the `regex_syntax` crate. It keeps track of the program it is generating as it walks the HIR, and returns the final program when it is done.
 
-```
+```rust
 #[derive(Default)]
 pub struct ProgramFactory {
     program: Program,
@@ -87,7 +87,7 @@ pub struct ProgramFactory {
 
 The `visit_pre` function is called for each node in the HIR. In this implementation, it only handles literals and empty nodes. For literals, it generates a `Char` instruction for each character in the literal. For empty nodes, it generates a Match instruction. When all nodes have been run, it calls the `finish` function and returns the `Program`.
 
-```
+```rust
 impl Visitor for ProgramFactory {
     type Err = ();
     type Output = Vec<Instruction>;
@@ -118,7 +118,7 @@ impl Visitor for ProgramFactory {
 
 Now that we have built the Program let's create a `Machine` struct that represents the state machine that will execute the program. It keeps track of the `program_counter` (where we are in the program), the `string_counter` (where we are in the string), and the content of the program itself that is to say a list of instructions.
 
-```
+```rust
 pub struct Machine {
     program_counter: usize,
     string_counter: usize,
@@ -128,7 +128,7 @@ pub struct Machine {
 
 Let's move to the implementation. We need to implement a function that will run the machine on a given input string. It loops through the program, executing each instruction until it reaches the end of the program.
 
-```
+```rust
 impl Machine {
     pub fn new(program: Program) -> Self {
         Self {
@@ -163,7 +163,7 @@ impl Machine {
 
 We have a first implementation. Let's test it. Create a main.rs file. We first use the `Parser` imported from the `regex_syntax` crate to parse the regular expression "abc" into a HIR of the regular expression syntax. We then use the `visit` function to convert the HIR into a program that can be executed by the virtual machine. Finally we call the `run` method of the machine with the input string we'd like to compare, here "abcc". It should return a boolean that indicates whether the input string matches the regular expression.
 
-```
+```rust
 use machine::Machine;
 use regex_syntax::hir::visit;
 use regex_syntax::Parser;
@@ -196,7 +196,7 @@ We started using two simple Instructions : `Char` and `Match`. To have a full im
 
 Each instruction will maintain an action struct where `next` represents the next state of the program the machine needs to go to and `offset` the number of instructions we offset the program counter when we advance state. Those two variables will be important in case we need to jump to another instruction or go back in the string.
 
-```
+```rust
 pub struct Action {
     pub next: usize,
     pub offset: i32,
