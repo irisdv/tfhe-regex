@@ -9,15 +9,9 @@ pub trait EncodedCipherTrait {
     fn less_or_equal(self, server_key: &ServerKey, rhs: Self) -> Ciphertext;
 }
 
-pub fn convert_str_to_cts<T:EncodedCipherTrait>(input: &str, client_key: &ClientKey) -> Vec<T> {
-    input
-    .bytes()
-        .map(|c| {
-            T::encrypt(client_key, c)
-        })
-        .collect()
+pub fn convert_str_to_cts<T: EncodedCipherTrait>(input: &str, client_key: &ClientKey) -> Vec<T> {
+    input.bytes().map(|c| T::encrypt(client_key, c)).collect()
 }
-
 
 #[derive(Clone)]
 pub struct EncodedCipher4bits {
@@ -29,10 +23,7 @@ impl EncodedCipherTrait for EncodedCipher4bits {
     fn encrypt(client_key: &ClientKey, c: u8) -> Self {
         let upper = client_key.encrypt(((c >> 4) & 0x0F) as u64);
         let lower = client_key.encrypt((c & 0x0F) as u64);
-        EncodedCipher4bits {
-            upper: upper,
-            lower: lower,
-        }
+        EncodedCipher4bits { upper, lower }
     }
 
     fn decrypt(self, client_key: &ClientKey) -> u8 {
@@ -51,7 +42,7 @@ impl EncodedCipherTrait for EncodedCipher4bits {
         let result_upper = server_key.unchecked_greater(&self.upper, &rhs.upper);
         let equal_upper = server_key.unchecked_equal(&self.upper, &rhs.upper);
         let result_lower = server_key.unchecked_greater_or_equal(&self.lower, &rhs.lower);
-        let result = server_key.unchecked_mul_lsb(&equal_upper, &&result_lower);
+        let result = server_key.unchecked_mul_lsb(&equal_upper, &result_lower);
         server_key.unchecked_add(&result_upper, &result)
     }
 
@@ -81,7 +72,7 @@ impl EncodedCipherTrait for EncodedCipher2bits {
         let j = client_key.encrypt(((c >> 4) & 0x03) as u64);
         let k = client_key.encrypt(((c >> 2) & 0x03) as u64);
         let l = client_key.encrypt((c & 0x3) as u64);
-        EncodedCipher2bits { i: i, j: j, k: k, l: l }
+        EncodedCipher2bits { i, j, k, l }
     }
 
     fn decrypt(self, client_key: &ClientKey) -> u8 {
@@ -106,7 +97,7 @@ impl EncodedCipherTrait for EncodedCipher2bits {
         // (Ai > Bi) + (Ai == Bi) *
         //          (Aj > Bj) + (Aj == Bj) *
         //                  (Ak > Bk) + (Ak == Bk) *
-        //                          (Al >= Bl) 
+        //                          (Al >= Bl)
         let result_i = server_key.unchecked_greater(&self.i, &rhs.i);
         let result_i_equal = server_key.unchecked_equal(&self.i, &rhs.i);
         let result_j = server_key.unchecked_greater(&self.j, &rhs.j);
@@ -128,7 +119,7 @@ impl EncodedCipherTrait for EncodedCipher2bits {
         // (Ai < Bi) + (Ai == Bi) *
         //          (Aj < Bj) + (Aj == Bj) *
         //                  (Ak < Bk) + (Ak == Bk) *
-        //                          (Al <= Bl) 
+        //                          (Al <= Bl)
         let result_i = server_key.unchecked_less(&self.i, &rhs.i);
         let result_i_equal = server_key.unchecked_equal(&self.i, &rhs.i);
         let result_j = server_key.unchecked_less(&self.j, &rhs.j);

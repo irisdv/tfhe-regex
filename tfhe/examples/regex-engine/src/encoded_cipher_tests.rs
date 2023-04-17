@@ -1,6 +1,6 @@
 use crate::CheckerCipher;
-use tfhe::shortint::{parameters::PARAM_MESSAGE_4_CARRY_4, prelude::*};
-use tfhe_regex::{EncodedCipher2bits, EncodedCipher4bits, EncodedCipherTrait};
+use tfhe::shortint::prelude::*;
+use tfhe_regex::{EncodedCipher2bits, EncodedCipherTrait};
 
 type TestEncodedCipher = EncodedCipher2bits;
 
@@ -19,11 +19,13 @@ fn get_keys() -> Result<(ClientKey, ServerKey, CheckerCipher), String> {
 #[test]
 fn check_encrypt_decrypt() {
     let (client_key, _, _) = get_keys().unwrap();
-    for value in [1_u8, 245_u8, 56_u8, 67_u8, 23_u8, 69_u8, 52_u8, 123_u8, 59_u8] {
+    for value in [
+        1_u8, 245_u8, 56_u8, 67_u8, 23_u8, 69_u8, 52_u8, 123_u8, 59_u8,
+    ] {
         let cipher = TestEncodedCipher::encrypt(&client_key, value);
         let result = cipher.decrypt(&client_key);
         assert!(value == result);
-    }    
+    }
 }
 
 #[test]

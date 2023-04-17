@@ -3,7 +3,7 @@ use regex_syntax::hir::{
 };
 use regex_syntax::Parser;
 
-use crate::program::{Action, Instruction, IntervalCharOptions, Program, ProgramItem};
+use crate::program::{Action, CharOptions, Instruction, IntervalCharOptions, Program, ProgramItem};
 
 pub struct Compiler {}
 
@@ -14,22 +14,12 @@ impl Compiler {
     }
 }
 
+#[derive(Default)]
 struct ProgramFactory {
     program: Program,
     is_repetition: bool,
     branch_counter: usize,
     jump_counter: usize,
-}
-
-impl Default for ProgramFactory {
-    fn default() -> Self {
-        Self {
-            program: Vec::new(),
-            is_repetition: false,
-            branch_counter: 0,
-            jump_counter: 0,
-        }
-    }
 }
 
 impl Visitor for ProgramFactory {
@@ -56,7 +46,11 @@ impl Visitor for ProgramFactory {
                     match literal {
                         Literal::Unicode(c) => {
                             self.program.push(ProgramItem {
-                                instruction: Instruction::Char(*c as u8),
+                                instruction: Instruction::Char(CharOptions {
+                                    char: *c as u8,
+                                    is_optional: false,
+                                    can_repeat: false,
+                                }),
                                 action: Action {
                                     next: self.program.len() + 1 + start,
                                     offset: 1,
@@ -65,7 +59,11 @@ impl Visitor for ProgramFactory {
                         }
                         Literal::Byte(b) => {
                             self.program.push(ProgramItem {
-                                instruction: Instruction::Char(*b),
+                                instruction: Instruction::Char(CharOptions {
+                                    char: *b,
+                                    can_repeat: false,
+                                    is_optional: false,
+                                }),
                                 action: Action {
                                     next: self.program.len() + 1 + start,
                                     offset: 1,
@@ -124,13 +122,31 @@ impl Visitor for ProgramFactory {
                         HirKind::Literal(literal) => {
                             let (instruction, repetition) = match literal {
                                 Literal::Unicode(c) => (
-                                    Instruction::Char(*c as u8),
-                                    Instruction::Repetition(*c as u8),
+                                    Instruction::Char(CharOptions {
+                                        char: *c as u8,
+                                        is_optional: false,
+                                        can_repeat: false,
+                                    }),
+                                    Instruction::Char(CharOptions {
+                                        char: *c as u8,
+                                        is_optional: false,
+                                        can_repeat: true,
+                                    }),
                                 ),
-                                Literal::Byte(b) => (
-                                    Instruction::Char(*b as u8),
-                                    Instruction::Repetition(*b as u8),
-                                ),
+                                Literal::Byte(b) => {
+                                    (
+                                        Instruction::Char(CharOptions {
+                                            char: *b,
+                                            is_optional: false,
+                                            can_repeat: false,
+                                        }),
+                                        Instruction::Char(CharOptions {
+                                            char: *b,
+                                            is_optional: false,
+                                            can_repeat: true,
+                                        }),
+                                    )
+                                }
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -180,10 +196,16 @@ impl Visitor for ProgramFactory {
                     RepetitionKind::ZeroOrMore => match repetition.hir.kind() {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
-                                Literal::Unicode(c) => {
-                                    Instruction::Repetition(*c as u8)
-                                }
-                                Literal::Byte(b) => Instruction::Repetition(*b),
+                                Literal::Unicode(c) => Instruction::Char(CharOptions {
+                                    char: *c as u8,
+                                    can_repeat: true,
+                                    is_optional: false,
+                                }),
+                                Literal::Byte(b) => Instruction::Char(CharOptions {
+                                    char: *b,
+                                    can_repeat: true,
+                                    is_optional: false,
+                                }),
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -215,10 +237,16 @@ impl Visitor for ProgramFactory {
                     RepetitionKind::ZeroOrOne => match repetition.hir.kind() {
                         HirKind::Literal(literal) => {
                             let instruction = match literal {
-                                Literal::Unicode(c) => {
-                                    Instruction::OptionalChar(*c as u8)
-                                }
-                                Literal::Byte(b) => Instruction::OptionalChar(*b),
+                                Literal::Unicode(c) => Instruction::Char(CharOptions {
+                                    char: *c as u8,
+                                    can_repeat: false,
+                                    is_optional: true,
+                                }),
+                                Literal::Byte(b) => Instruction::Char(CharOptions {
+                                    char: *b,
+                                    can_repeat: false,
+                                    is_optional: true,
+                                }),
                             };
                             self.program.push(ProgramItem {
                                 instruction,
@@ -251,10 +279,16 @@ impl Visitor for ProgramFactory {
                         RepetitionRange::Exactly(n) => match repetition.hir.kind() {
                             HirKind::Literal(literal) => {
                                 let instruction = match literal {
-                                    Literal::Unicode(c) => {
-                                        Instruction::Char(*c as u8)
-                                    }
-                                    Literal::Byte(b) => Instruction::Char(*b),
+                                    Literal::Unicode(c) => Instruction::Char(CharOptions {
+                                        char: *c as u8,
+                                        can_repeat: false,
+                                        is_optional: false,
+                                    }),
+                                    Literal::Byte(b) => Instruction::Char(CharOptions {
+                                        char: *b,
+                                        can_repeat: false,
+                                        is_optional: false,
+                                    }),
                                 };
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
@@ -293,13 +327,31 @@ impl Visitor for ProgramFactory {
                             HirKind::Literal(literal) => {
                                 let (instruction, repetition) = match literal {
                                     Literal::Unicode(c) => (
-                                        Instruction::Char(*c as u8),
-                                        Instruction::Repetition(*c as u8),
+                                        Instruction::Char(CharOptions {
+                                            char: *c as u8,
+                                            can_repeat: false,
+                                            is_optional: false,
+                                        }),
+                                        Instruction::Char(CharOptions {
+                                            char: *c as u8,
+                                            can_repeat: true,
+                                            is_optional: false,
+                                        }),
                                     ),
-                                    Literal::Byte(b) => (
-                                        Instruction::Char(*b),
-                                        Instruction::Repetition(*b),
-                                    ),
+                                    Literal::Byte(b) => {
+                                        (
+                                            Instruction::Char(CharOptions {
+                                                char: *b,
+                                                can_repeat: false,
+                                                is_optional: false,
+                                            }),
+                                            Instruction::Char(CharOptions {
+                                                char: *b,
+                                                can_repeat: true,
+                                                is_optional: false,
+                                            }),
+                                        )
+                                    }
                                 };
                                 for _i in 0..n {
                                     self.program.push(ProgramItem {
@@ -358,13 +410,32 @@ impl Visitor for ProgramFactory {
                             HirKind::Literal(literal) => {
                                 let (instruction, optional_char) = match literal {
                                     Literal::Unicode(c) => (
-                                        Instruction::Char(*c as u8),
-                                        Instruction::OptionalChar(*c as u8),
+                                        Instruction::Char(CharOptions {
+                                            char: *c as u8,
+                                            can_repeat: false,
+                                            is_optional: false,
+                                        }),
+                                        Instruction::Char(CharOptions {
+                                            char: *c as u8,
+                                            can_repeat: false,
+                                            is_optional: true,
+                                        }),
                                     ),
-                                    Literal::Byte(b) => (
-                                        Instruction::Char(*b),
-                                        Instruction::OptionalChar(*b),
-                                    ),
+                                    Literal::Byte(b) => {
+                                        // (Instruction::Char(*b), Instruction::OptionalChar(*b))
+                                        (
+                                            Instruction::Char(CharOptions {
+                                                char: *b,
+                                                can_repeat: false,
+                                                is_optional: false,
+                                            }),
+                                            Instruction::Char(CharOptions {
+                                                char: *b,
+                                                can_repeat: false,
+                                                is_optional: true,
+                                            }),
+                                        )
+                                    }
                                 };
                                 for _i in 0..m {
                                     self.program.push(ProgramItem {
