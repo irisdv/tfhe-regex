@@ -205,8 +205,72 @@ pub struct Action {
 
 With those additional instructions we'll be able to handle more complexe cases. Exact matching of a string using `Start` and `Match`. An alternative matching containing optional chars and ranges of characters using `Char`, `IntervalChar`, `Branch`, `Jump`, etc.
 
-Full definition of the instructions are [here](https://#).
+Full definition of the instructions are [here](../examples/regex-engine/src/program.rs#L19).
 
-#### Compiler
 
 ## Homomorphic Regex Engine
+
+
+### Ciphered character matching
+To avoid too much computation we have made the following trade off:
+- each time we need to check if a ciphered character is the expected one, we query back the client.
+- each time we need to check if a ciphered character is in the expected range, we query back the client.
+
+Querying the client is done by the following [methods](../examples/regex-engine/src/tfhe_machine.rs#L30-L40) in `TFHEMachine`:
+```rust
+fn ct_are_equal(&self, checker: &impl CheckerCipherTrait, left: T, right: T) -> bool {
+    let result = left.equal(&self.server_key, right);
+    checker.is_true(&result)
+}
+
+fn ct_in_range(&self, checker: &impl CheckerCipherTrait, value: T, start: T, end: T) -> bool {
+    let greater = value.clone().greater_or_equal(&self.server_key, start);
+    let less = value.less_or_equal(&self.server_key, end);
+    let result = self.server_key.unchecked_mul_lsb(&less, &greater);
+    checker.is_true(&result)
+}
+```
+
+`checker` is a parameter of the `run` method which implements the following trait:
+```rust
+pub trait CheckerCipherTrait {
+    fn is_true(&self, ct_result: &Ciphertext) -> bool;
+}
+```
+
+With this `checker` delegation we ensure that `TFHEMachine` doesn't know how to decipher character.
+
+
+You will find a simple implementation for `checker` in our tutorial example:
+```rust
+struct CheckerCipher {
+    client_key: ClientKey,
+}
+
+impl tfhe_machine::CheckerCipherTrait for CheckerCipher {
+    fn is_true(&self, ct_result: &Ciphertext) -> bool {
+        self.client_key.decrypt(ct_result) != 0_u64
+    }
+}
+
+fn main() {
+    let (client_key, server_key) = gen_keys(Parameters::default());
+
+    let checker = CheckerCipher {
+        client_key: client_key.clone(),
+    };
+    
+    // skip
+    // regular expression compilation, ciphering, ...
+    // skip
+
+    let result = machine.run(input, &checker);
+    // ...
+}
+```
+
+
+
+
+### Ciphered Regex instruction
+
